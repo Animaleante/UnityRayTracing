@@ -10,10 +10,14 @@ public class RayTracingManager : MonoBehaviour
 
 	[Header("View Settings")]
     [SerializeField] bool useShaderInSceneView;
+    [SerializeField] bool showFocusPlane;
 
 	[Header("Ray Tracing Settings")]
     [SerializeField, Range(0, 32)] int maxBounceCount = 4;
     [SerializeField, Range(0, 64)] int numRaysPerPixel = 10;
+	[SerializeField, Min(0)] float divergeStrength = 0.3f;
+	[SerializeField, Min(0)] float defocusStrength = 0;
+	[SerializeField, Min(0)] float focusDistance = 1;
 	[SerializeField] EnvironmentSettings environmentSettings;
 
 	[Header("References")]
@@ -97,10 +101,15 @@ public class RayTracingManager : MonoBehaviour
 
     void UpdateCameraParams(Camera cam)
     {
-        float planeHeight = cam.nearClipPlane * Tan(cam.fieldOfView * 0.5f * Deg2Rad) * 2;
+        // float planeHeight = cam.nearClipPlane * Tan(cam.fieldOfView * 0.5f * Deg2Rad) * 2;
+        float planeHeight = focusDistance * Tan(cam.fieldOfView * 0.5f * Deg2Rad) * 2;
         float planeWidth = planeHeight * cam.aspect;
 
-        rayTracingMaterial.SetVector("ViewParams", new Vector3(planeWidth, planeHeight, cam.nearClipPlane));
+		// Debug.Log(new Vector3(planeWidth, planeHeight, focusDistance));
+		// Debug.Log(cam.transform.localToWorldMatrix);
+
+        // rayTracingMaterial.SetVector("ViewParams", new Vector3(planeWidth, planeHeight, cam.nearClipPlane));
+        rayTracingMaterial.SetVector("ViewParams", new Vector3(planeWidth, planeHeight, focusDistance));
         rayTracingMaterial.SetMatrix("CamLocalToWorldMatrix", cam.transform.localToWorldMatrix);
     }
 
@@ -123,7 +132,7 @@ public class RayTracingManager : MonoBehaviour
 		// Create buffer containing all sphere data, and send it to the shader
 		ShaderHelper.CreateStructuredBuffer(ref sphereBuffer, spheres);
 		rayTracingMaterial.SetBuffer("Spheres", sphereBuffer);
-		rayTracingMaterial.SetInt("NumSpheres", sphereObjects.Length);
+		rayTracingMaterial.SetInteger("NumSpheres", sphereObjects.Length);
 	}
 
     void CreateMeshes()
@@ -154,14 +163,17 @@ public class RayTracingManager : MonoBehaviour
 		ShaderHelper.CreateStructuredBuffer(ref meshInfoBuffer, allMeshInfo);
 		rayTracingMaterial.SetBuffer("Triangles", triangleBuffer);
 		rayTracingMaterial.SetBuffer("AllMeshInfo", meshInfoBuffer);
-		rayTracingMaterial.SetInt("NumMeshes", allMeshInfo.Count);
+		rayTracingMaterial.SetInteger("NumMeshes", allMeshInfo.Count);
     }
 
     void SetShaderParams()
     {
-		rayTracingMaterial.SetInt("MaxBounceCount", maxBounceCount);
-        rayTracingMaterial.SetInt("NumRaysPerPixel", numRaysPerPixel);
-		rayTracingMaterial.SetInt("Frame", numRenderedFrames);
+		rayTracingMaterial.SetInteger("MaxBounceCount", maxBounceCount);
+        rayTracingMaterial.SetInteger("NumRaysPerPixel", numRaysPerPixel);
+		rayTracingMaterial.SetInteger("Frame", numRenderedFrames);
+		rayTracingMaterial.SetFloat("DivergeStrength", divergeStrength);
+		rayTracingMaterial.SetFloat("DefocusStrength", defocusStrength);
+		rayTracingMaterial.SetInteger("ShowFocusPlane", showFocusPlane ? 1 : 0);
 
 		rayTracingMaterial.SetInteger("EnvironmentEnabled", environmentSettings.enabled ? 1 : 0);
 		rayTracingMaterial.SetColor("GroundColor", environmentSettings.groundColor);
