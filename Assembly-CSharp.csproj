@@ -42,18 +42,24 @@
   <ItemGroup>
      <Compile Include="Assets\Scripts\Cam Test.cs" />
      <Compile Include="Assets\Scripts\RaytracedMesh.cs" />
+     <Compile Include="Assets\DebugDrawingExtension\Example\Example.cs" />
+     <Compile Include="Assets\Scripts\RandomInCircle.cs" />
      <Compile Include="Assets\Scripts\ShaderHelper.cs" />
      <Compile Include="Assets\Scripts\StereographicProjectionTest.cs" />
+     <Compile Include="Assets\DebugDrawingExtension\DebugExtension.cs" />
      <Compile Include="Assets\Scripts\RayTracingMaterial.cs" />
      <Compile Include="Assets\Scripts\MeshSplitter.cs" />
      <Compile Include="Assets\Scripts\EnvironmentSettings.cs" />
      <Compile Include="Assets\Scripts\MeshInfo.cs" />
      <Compile Include="Assets\Scripts\MeshChunk.cs" />
      <Compile Include="Assets\Scripts\Triangle.cs" />
+     <Compile Include="Assets\Scripts\CameraRayJitterTest.cs" />
      <Compile Include="Assets\Scripts\RayTracedSphere.cs" />
      <Compile Include="Assets\Scripts\Sphere.cs" />
      <Compile Include="Assets\Scripts\RayTracingManager.cs" />
+     <Compile Include="Assets\Scripts\Random.cs" />
      <None Include="Assets\Shaders\RayTracing.shader" />
+     <None Include="Assets\DebugDrawingExtension\readme.txt" />
      <None Include="Assets\Shaders\Accumulate.shader" />
     <Reference Include="UnityEngine">
         <HintPath>C:\Program Files\Unity\Hub\Editor\2022.3.4f1\Editor\Data\Managed\UnityEngine\UnityEngine.dll</HintPath>

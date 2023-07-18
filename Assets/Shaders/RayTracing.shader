@@ -440,7 +440,8 @@ Shader "Custom/RayTracing"
                 //uv.x *= _ScreenParams.x / _ScreenParams.y;
                 //return length(uv);
 
-                return renderSingleRayPerPixel(i);
+                // return renderSingleRayPerPixel(i);
+                return renderMultipleRaysPerPixelWithJittering(i);
 
                 /*if(i.uv.x < 0.25) {
                     return i.uv.y;
