@@ -356,6 +356,68 @@ Shader "Custom/RayTracing"
                 return incomingLight;
             }
 
+            float3 Trace(Ray ray, inout uint rngState, float originalLength)
+            {
+                float3 incomingLight = 0;
+                float3 rayColor = 1;
+
+                for(int bounceIndex = 0; bounceIndex <= MaxBounceCount; bounceIndex++)
+                {
+                    HitInfo hitInfo = CalculateRayCollision(ray);
+
+                    if(hitInfo.didHit)
+                    {
+                        RayTracingMaterial material = hitInfo.material;
+
+                        float3 originalOrigin = ray.origin;
+                        float3 originalDir = ray.dir;
+
+                        if (material.flag == CheckerPattern)
+                        {
+                            float2 c = mod2(floor(hitInfo.hitPoint.xz), 2.0);
+                            material.color = c.x == c.y ? material.color : material.emissionColor;
+                        }
+                        else if (material.flag == InvisibleLightSource && bounceIndex == 0)
+						{
+							ray.origin = hitInfo.hitPoint + ray.dir * 0.001;
+                            if (ShowFocusPlane && bounceIndex == 0) {
+                                rayColor += float4(1,0,0,0.5);
+                            }
+							continue;
+						}
+
+                        ray.origin = hitInfo.hitPoint;
+                        //ray.dir = hitInfo.normal;
+                        //ray.dir = RandomHemisphereDirection(hitInfo.normal, rngState);
+                        //ray.dir = normalize(hitInfo.normal + RandomDirection(rngState));
+                        float3 diffuseDir = normalize(hitInfo.normal + RandomDirection(rngState));
+                        float3 specularDir = reflect(ray.dir, hitInfo.normal);
+                        bool isSpecularBounce = material.specularProbability >= RandomValue(rngState);
+                        // ray.dir = lerp(diffuseDir, specularDir, material.smoothness * isSpecularBounce);
+                        ray.dir = normalize(lerp(diffuseDir, specularDir, material.smoothness * isSpecularBounce));
+
+                        float3 emittedLight = material.emissionColor * material.emissionStrength;
+                        //float lightStrength = dot(hitInfo.normal, ray.dir);
+                        incomingLight += emittedLight * rayColor;
+                        // rayColor *= material.color;
+                        //rayColor *= material.color * lightStrength * 2;
+                        rayColor *= lerp(material.color, material.specularColor, isSpecularBounce);
+
+                        if (bounceIndex == 0 && hitInfo.distance > originalLength) {
+                            rayColor += float4(1,0,0,0.5);
+                        }
+                    } else {
+                        if (bounceIndex == 0) {
+                            rayColor += float4(1,0,0,0.5);
+                        }
+                        incomingLight += GetEnvironmentLight(ray) * rayColor;
+                        break;
+                    }
+                }
+
+                return incomingLight;
+            }
+
             float4 renderSingleRayPerPixel(v2f i)
             {
                 uint2 numPixels = _ScreenParams.xy;
@@ -370,7 +432,12 @@ Shader "Custom/RayTracing"
                 ray.origin = _WorldSpaceCameraPos;
                 ray.dir = normalize(viewPoint - ray.origin);
 
-                float3 pixelCol = Trace(ray, rngState);
+                float3 pixelCol = float3(0,0,0);
+                if (ShowFocusPlane) {
+                    pixelCol = Trace(ray, rngState, length(viewPoint - ray.origin));
+                } else {
+                    pixelCol = Trace(ray, rngState);
+                }
                 return float4(pixelCol, 1);
             }
 
@@ -426,7 +493,11 @@ Shader "Custom/RayTracing"
 					float3 jitteredFocusPoint = viewPoint + camRight * jitter.x + camUp * jitter.y;
 
                     ray.dir = normalize(jitteredFocusPoint - ray.origin);
-                    totalIncomingLight += Trace(ray, rngState);
+                    if (ShowFocusPlane) {
+                        totalIncomingLight += Trace(ray, rngState, length(jitteredFocusPoint - ray.origin));
+                    } else {
+                        totalIncomingLight += Trace(ray, rngState);
+                    }
                 }
 
                 float3 pixelCol = totalIncomingLight / NumRaysPerPixel;
