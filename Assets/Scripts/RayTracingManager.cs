@@ -11,6 +11,7 @@ public class RayTracingManager : MonoBehaviour
 	[Header("View Settings")]
     [SerializeField] bool useShaderInSceneView;
     [SerializeField] bool showFocusPlane;
+    [SerializeField] bool useSingleRayForDebug;
 
 	[Header("Ray Tracing Settings")]
     [SerializeField, Range(0, 32)] int maxBounceCount = 4;
@@ -174,6 +175,7 @@ public class RayTracingManager : MonoBehaviour
 		rayTracingMaterial.SetFloat("DivergeStrength", divergeStrength);
 		rayTracingMaterial.SetFloat("DefocusStrength", defocusStrength);
 		rayTracingMaterial.SetInteger("ShowFocusPlane", showFocusPlane ? 1 : 0);
+		rayTracingMaterial.SetInteger("UseSingleRayForDebug", useSingleRayForDebug ? 1 : 0);
 
 		rayTracingMaterial.SetInteger("EnvironmentEnabled", environmentSettings.enabled ? 1 : 0);
 		rayTracingMaterial.SetColor("GroundColor", environmentSettings.groundColor);
