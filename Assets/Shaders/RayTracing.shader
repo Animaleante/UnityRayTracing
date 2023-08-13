@@ -46,6 +46,7 @@ Shader "Custom/RayTracing"
             float DivergeStrength;
             float DefocusStrength;
             int ShowFocusPlane;
+            int UseSingleRayForDebug;
 
 			// Environment Settings
 			int EnvironmentEnabled;
@@ -360,8 +361,10 @@ Shader "Custom/RayTracing"
             {
                 float3 incomingLight = 0;
                 float3 rayColor = 1;
+                // int bounceIndex = 0;
 
                 for(int bounceIndex = 0; bounceIndex <= MaxBounceCount; bounceIndex++)
+                // for(bounceIndex = 0; bounceIndex <= MaxBounceCount; bounceIndex++)
                 {
                     HitInfo hitInfo = CalculateRayCollision(ray);
 
@@ -416,6 +419,9 @@ Shader "Custom/RayTracing"
                 }
 
                 return incomingLight;
+                // float bounceDensity = 1.0 - bounceIndex / MaxBounceCount;
+                // float bounceDensity = bounceIndex / MaxBounceCount;
+                // return float3(bounceDensity,bounceDensity,bounceDensity);
             }
 
             float4 renderSingleRayPerPixel(v2f i)
@@ -437,6 +443,16 @@ Shader "Custom/RayTracing"
                     pixelCol = Trace(ray, rngState, length(viewPoint - ray.origin));
                 } else {
                     pixelCol = Trace(ray, rngState);
+
+                    /*HitInfo hitInfo = CalculateRayCollision(ray);
+
+                    if(hitInfo.didHit) {
+                        // return float4(hitInfo.hitPoint, 1);
+                        // return float4(abs(hitInfo.normal), 1);
+                        return hitInfo.material.color;
+                    } else {
+                        return float4(0,0,0,1);
+                    }*/
                 }
                 return float4(pixelCol, 1);
             }
@@ -511,8 +527,11 @@ Shader "Custom/RayTracing"
                 //uv.x *= _ScreenParams.x / _ScreenParams.y;
                 //return length(uv);
 
-                // return renderSingleRayPerPixel(i);
-                return renderMultipleRaysPerPixelWithJittering(i);
+                if (UseSingleRayForDebug) {
+                    return renderSingleRayPerPixel(i);
+                } else {
+                    return renderMultipleRaysPerPixelWithJittering(i);
+                }
 
                 /*if(i.uv.x < 0.25) {
                     return i.uv.y;

@@ -10,6 +10,7 @@ public class CameraRayJitterTest : MonoBehaviour
 
 	[Header("Debug Settings")]
 	[SerializeField] bool showMiddleOneOnly = false;
+	[SerializeField] bool calculateHits = false;
 
 	[Header("Ray Tracing Settings")]
     [SerializeField, Range(1, 64)] int numRaysPerPixel = 10;
@@ -25,25 +26,32 @@ public class CameraRayJitterTest : MonoBehaviour
     void Start()
     {
         cam = GetComponent<Camera>();
-        float planeHeight = focusDistance * Tan(cam.fieldOfView * 0.5f * Deg2Rad) * 2;
+
+        /*float planeHeight = focusDistance * Tan(cam.fieldOfView * 0.5f * Deg2Rad) * 2;
         float planeWidth = planeHeight * cam.aspect;
         Vector3 viewParams = new Vector3(planeWidth, planeHeight, focusDistance);
 
-        // float3 viewPointLocal = float3(i.uv - 0.5, 1) * ViewParams;
-        // float3 viewPoint = mul(CamLocalToWorldMatrix, float4(viewPointLocal, 1));
         Vector3 screenPos = new Vector3(-0.5f,-0.5f,1);
         Vector3 viewLocal = Vector3.Scale(screenPos, viewParams);
-        // Vector3 viewPoint = cam.transform.localToWorldMatrix * new Vector4(viewLocal, 1);
         Vector4 viewPoint = cam.transform.localToWorldMatrix * (new Vector4(viewLocal.x, viewLocal.y, viewLocal.z, 1.0f));
 
         Debug.Log(viewPoint);
         Vector3 rayOrigin = cam.transform.position;
         Vector3 rayDir = (new Vector3(viewPoint.x, viewPoint.y, viewPoint.z) - cam.transform.position).normalized;
-        Debug.Log(rayDir);
+        Debug.Log(rayDir);*/
     }
 
     void Update()
     {
+        if (calculateHits) {
+            RayTracedBoundingBox[] aabbObjects = FindObjectsOfType<RayTracedBoundingBox>();
+
+            for (int j = 0; j < aabbObjects.Length; j++)
+            {
+                aabbObjects[j].GetComponent<Renderer>().material.color = Color.white;
+            }
+        }
+
         // int imageWidth = 5;
         int imageWidth = Screen.width;
         // int imageHeight = (int)(imageWidth / cam.aspect);
@@ -97,6 +105,30 @@ public class CameraRayJitterTest : MonoBehaviour
                     // DebugExtension.DebugCone(jitteredOrigin + dir * focusDistance, -dir.normalized * .15f, c, 15);
                     DebugExtension.DebugWireSphere((jitteredViewPoint - jitteredOrigin) * focusDistance, Color.red, .1f);
                     DrawArrow(jitteredOrigin, dir, focusDistance, c);
+
+                    if (calculateHits) {
+		                RayTracedBoundingBox[] aabbObjects = FindObjectsOfType<RayTracedBoundingBox>();
+                        BoundingBox[] aabbs = new BoundingBox[aabbObjects.Length];
+
+                        for (int j = 0; j < aabbObjects.Length; j++)
+                        {
+                            Bounds b = aabbObjects[j].GetCollider().bounds;
+                            aabbs[j] = new BoundingBox()
+                            {
+                                min = b.min,
+                                max = b.max,
+                            };
+
+                            bool isHit = HitAABB(jitteredOrigin, dir, b.min, b.max);
+                            // Debug.Log("Ray hits bounding box["+j+"]: " + (isHit ? "true" : "false"));
+
+                            Material material = aabbObjects[j].GetComponent<Renderer>().material;
+                            // material.color = isHit ? Color.red : Color.white;
+                            if (material.color != Color.red) {
+                                material.color = isHit ? Color.red : Color.white;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -111,6 +143,70 @@ public class CameraRayJitterTest : MonoBehaviour
         Vector2 pointOnCircle = new Vector2(Cos(angle), Sin(angle));
         float r = Random.RandomValue(ref rngState);
         return pointOnCircle * Sqrt(Random.RandomValue(ref rngState));
+    }
+
+    /*
+    inline bool aabb::hit(const ray& r, double t_min, double t_max) const {
+        for (int a = 0; a < 3; a++) {
+            auto invD = 1.0f / r.direction()[a];
+            auto t0 = (min()[a] - r.origin()[a]) * invD;
+            auto t1 = (max()[a] - r.origin()[a]) * invD;
+            if (invD < 0.0f)
+                std::swap(t0, t1);
+            t_min = t0 > t_min ? t0 : t_min;
+            t_max = t1 < t_max ? t1 : t_max;
+            if (t_max <= t_min)
+                return false;
+        }
+        return true;
+    }
+    */
+
+    bool HitAABB(Vector3 rayOrigin, Vector3 rayDir, Vector3 min, Vector3 max)
+    {
+        float invD = 1.0f / rayDir.x;
+        float t0 = (min.x - rayOrigin.x) * invD;
+        float t1 = (max.x - rayOrigin.x) * invD;
+        if (invD < 0.0f) {
+            (t1,t0) = (t0,t1);
+        }
+
+        float t_min = 0.0f;
+        float t_max = float.PositiveInfinity;
+
+        t_min = t0 > t_min ? t0 : t_min;
+        t_max = t1 < t_max ? t1 : t_max;
+        if (t_max <= t_min) {
+            return false;
+        }
+
+        invD = 1.0f / rayDir.y;
+        t0 = (min.y - rayOrigin.y) * invD;
+        t1 = (max.y - rayOrigin.y) * invD;
+        if (invD < 0.0f) {
+            (t1,t0) = (t0,t1);
+        }
+
+        t_min = t0 > t_min ? t0 : t_min;
+        t_max = t1 < t_max ? t1 : t_max;
+        if (t_max <= t_min) {
+            return false;
+        }
+
+        invD = 1.0f / rayDir.z;
+        t0 = (min.z - rayOrigin.z) * invD;
+        t1 = (max.z - rayOrigin.z) * invD;
+        if (invD < 0.0f) {
+            (t1,t0) = (t0,t1);
+        }
+
+        t_min = t0 > t_min ? t0 : t_min;
+        t_max = t1 < t_max ? t1 : t_max;
+        if (t_max <= t_min) {
+            return false;
+        }
+
+        return true;
     }
 
     void DrawArrow(Vector3 origin, Vector3 direction, float length, Color color)

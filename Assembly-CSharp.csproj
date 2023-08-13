@@ -48,9 +48,11 @@
      <Compile Include="Assets/Scripts/StereographicProjectionTest.cs" />
      <Compile Include="Assets/DebugDrawingExtension/DebugExtension.cs" />
      <Compile Include="Assets/Scripts/RayTracingMaterial.cs" />
+     <Compile Include="Assets/Scripts/BoundingBox.cs" />
      <Compile Include="Assets/Scripts/MeshSplitter.cs" />
      <Compile Include="Assets/Scripts/EnvironmentSettings.cs" />
      <Compile Include="Assets/Scripts/MeshInfo.cs" />
+     <Compile Include="Assets/Scripts/RayTracedBoundingBox.cs" />
      <Compile Include="Assets/Scripts/MeshChunk.cs" />
      <Compile Include="Assets/Scripts/Triangle.cs" />
      <Compile Include="Assets/Scripts/CameraRayJitterTest.cs" />
