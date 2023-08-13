@@ -55,6 +55,7 @@
      <Compile Include="Assets\Scripts\Triangle.cs" />
      <Compile Include="Assets\Scripts\CameraRayJitterTest.cs" />
      <Compile Include="Assets\Scripts\RayTracedSphere.cs" />
+     <Compile Include="Assets\Scripts\LookAt.cs" />
      <Compile Include="Assets\Scripts\Sphere.cs" />
      <Compile Include="Assets\Scripts\RayTracingManager.cs" />
      <Compile Include="Assets\Scripts\Random.cs" />

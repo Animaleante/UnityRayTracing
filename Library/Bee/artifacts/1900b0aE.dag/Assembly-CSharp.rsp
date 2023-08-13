@@ -357,6 +357,7 @@
 "Assets/Scripts/Cam Test.cs"
 "Assets/Scripts/CameraRayJitterTest.cs"
 "Assets/Scripts/EnvironmentSettings.cs"
+"Assets/Scripts/LookAt.cs"
 "Assets/Scripts/MeshChunk.cs"
 "Assets/Scripts/MeshInfo.cs"
 "Assets/Scripts/MeshSplitter.cs"
