@@ -10,12 +10,6 @@ public class RandomInCircle : MonoBehaviour
     [SerializeField, Range(1,10000)] int samplesCount;
     [SerializeField, Range(0,1.0f)] float lerpSqrt;
 
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
-
     // Update is called once per frame
     void Update()
     {
@@ -27,7 +21,8 @@ public class RandomInCircle : MonoBehaviour
         for (int i = 0; i < samplesCount; i++)
         {
             Vector2 p = GetPointInCircle(ref rngState);
-            DebugExtension.DebugPoint(new Vector3(p.x, p.y, 0), green, 0.05f);
+            // DebugExtension.DebugPoint(new Vector3(p.x, p.y, 0), green, 0.05f);
+            DebugExtension.DebugWireSphere(new Vector3(p.x, p.y, 0), green, .01f);
         }
     }
 

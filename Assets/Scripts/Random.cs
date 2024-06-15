@@ -13,4 +13,9 @@ public static class Random
         // Debug.Log("Result: " + (result / 4294967295.0f));
         return result / 4294967295.0f;
     }
+
+    public static float RandomValue(ref uint state, float min, float max)
+    {
+        return min + (max - min) * RandomValue(ref state);
+    }
 }
