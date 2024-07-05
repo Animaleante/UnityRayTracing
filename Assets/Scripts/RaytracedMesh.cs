@@ -47,6 +47,7 @@ public class RayTracedMesh : MonoBehaviour
 			{
 				worldChunks[i] = new MeshChunk(new Triangle[localChunk.triangles.Length], localChunk.bounds, localChunk.subMeshIndex);
 			}
+			
 			UpdateWorldChunkFromLocal(worldChunks[i], localChunk, pos, rot, scale);
 		}
 

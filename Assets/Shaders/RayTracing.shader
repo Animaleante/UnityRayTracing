@@ -39,6 +39,7 @@ Shader "Custom/RayTracing"
             int MaxBounceCount;
             int NumRaysPerPixel;
             int Frame;
+            int LightSamples;
 
             // Camera Settings
             float3 ViewParams;
@@ -47,6 +48,7 @@ Shader "Custom/RayTracing"
             float DefocusStrength;
             int ShowFocusPlane;
             int UseSingleRayForDebug;
+            int UseImportanceSampling;
 
 			// Environment Settings
 			int EnvironmentEnabled;
@@ -106,6 +108,7 @@ Shader "Custom/RayTracing"
                 float distance;
                 float3 hitPoint;
                 float3 normal;
+                Triangle tri;
                 RayTracingMaterial material;
             };
 
@@ -115,7 +118,9 @@ Shader "Custom/RayTracing"
 
 			StructuredBuffer<Triangle> Triangles;
 			StructuredBuffer<MeshInfo> AllMeshInfo;
+			StructuredBuffer<uint> Lights;
 			int NumMeshes;
+			int NumLights;
 
             // --- Ray Intersection Functions ---
         
@@ -170,6 +175,7 @@ Shader "Custom/RayTracing"
 				hitInfo.hitPoint = ray.origin + ray.dir * dst;
 				hitInfo.normal = normalize(tri.normalA * w + tri.normalB * u + tri.normalC * v);
 				hitInfo.distance = dst;
+                hitInfo.tri = tri;
 				return hitInfo;
 			}
 
@@ -188,6 +194,7 @@ Shader "Custom/RayTracing"
 
             // --- RNG Stuff ---
 
+            // From 0(inclusive) to 1(exclusive)
             float RandomValue(inout uint state)
             {
                 //state *= 9694;
@@ -201,11 +208,21 @@ Shader "Custom/RayTracing"
                 return result / 4294967295.0;
             }
 
+            float RandomValueRange(inout uint state, float min, float max)
+            {
+                return RandomValue(state) * (max - min) + min;
+            }
+
             float RandomValueNormalDistribution(inout uint state)
             {
                 float theta = 2 * 3.1415926 * RandomValue(state);
                 float rho = sqrt(-2 * log(RandomValue(state)));
                 return rho * cos(theta);
+            }
+
+            float RandomValueNormalDistributionRange(inout uint state, float min, float max)
+            {
+                return RandomValueNormalDistribution(state) * (max - min) + min;
             }
 
             float3 RandomDirection(inout uint state)
@@ -227,6 +244,29 @@ Shader "Custom/RayTracing"
                 float angle = RandomValue(rngState) * DOUBLE_PI;
                 float2 pointOnCircle = float2(cos(angle), sin(angle));
                 return pointOnCircle * sqrt(RandomValue(rngState));
+            }
+
+            float3 RandomPointInBox(inout uint rngState, float3 boundsMin, float3 boundsMax)
+            {
+                float3 center = (boundsMax - boundsMin) + boundsMin;
+                /*float3 halfSize = float3(
+                    (boundsMax.x - boundsMin.x) / 2,
+                    (boundsMax.y - boundsMin.y) / 2,
+                    (boundsMax.z - boundsMin.z) / 2,
+                );*/
+                float3 halfSize = (boundsMax - boundsMin) / 2;
+                
+                /*float u = RandomValueRange(-1,1);
+                float v = RandomValueRange(-1,1);
+                float w = RandomValueRange(-1,1);*/
+                float3 uvw = float3(RandomValueRange(rngState, -1,1), RandomValueRange(rngState, -1,1), RandomValueRange(rngState, -1,1));
+                
+                /*return float3(
+                    center.x + u * halfSize.x,
+                    center.y + v * halfSize.y,
+                    center.z + u * w * halfSize.z
+                );*/
+                return center + (uvw * halfSize);
             }
 
             float2 mod2(float2 x, float2 y)
@@ -293,6 +333,30 @@ Shader "Custom/RayTracing"
                 return closestHit;
             }
 
+            float CalculateContribution(HitInfo hitInfo, float3 lightPoint, float3 lightNormal, float emission)
+            {
+                float3 intersectionPoint = hitInfo.hitPoint;
+                float3 dir = normalize(lightPoint - intersectionPoint);
+                float dist = distance(lightPoint, intersectionPoint);
+                float attenuation = 1 / (dist * dist);
+
+                float cosThetaHitPoint = max(0, dot(hitInfo.normal, dir));
+                float cosThetaLight = max(0, dot(lightNormal, -dir));
+
+                // check for obstruction
+                Ray ray;
+                ray.origin = intersectionPoint;
+                ray.dir = dir;
+                HitInfo hitInfoOther = CalculateRayCollision(ray);
+
+                // Hit something that is not a light
+                if (hitInfoOther.material.emissionStrength == 0) {
+                    return 0;
+                }
+
+                return emission * attenuation * cosThetaHitPoint * cosThetaLight;
+            }
+
             float3 Trace(Ray ray, inout uint rngState)
             {
                 float3 incomingLight = 0;
@@ -323,22 +387,57 @@ Shader "Custom/RayTracing"
 							continue;
 						}
 
-                        ray.origin = hitInfo.hitPoint;
-                        //ray.dir = hitInfo.normal;
-                        //ray.dir = RandomHemisphereDirection(hitInfo.normal, rngState);
-                        //ray.dir = normalize(hitInfo.normal + RandomDirection(rngState));
-                        float3 diffuseDir = normalize(hitInfo.normal + RandomDirection(rngState));
-                        float3 specularDir = reflect(ray.dir, hitInfo.normal);
                         bool isSpecularBounce = material.specularProbability >= RandomValue(rngState);
-                        // ray.dir = lerp(diffuseDir, specularDir, material.smoothness * isSpecularBounce);
-                        ray.dir = normalize(lerp(diffuseDir, specularDir, material.smoothness * isSpecularBounce));
+                        
+                        if (bounceIndex < MaxBounceCount) {
+                            ray.origin = hitInfo.hitPoint;
+                            //ray.dir = hitInfo.normal;
+                            //ray.dir = RandomHemisphereDirection(hitInfo.normal, rngState);
+                            //ray.dir = normalize(hitInfo.normal + RandomDirection(rngState));
+                            float3 diffuseDir = normalize(hitInfo.normal + RandomDirection(rngState));
+                            float3 specularDir = reflect(ray.dir, hitInfo.normal);
+                            // ray.dir = lerp(diffuseDir, specularDir, material.smoothness * isSpecularBounce);
+                            ray.dir = normalize(lerp(diffuseDir, specularDir, material.smoothness * isSpecularBounce));
+                        }
 
                         float3 emittedLight = material.emissionColor * material.emissionStrength;
                         //float lightStrength = dot(hitInfo.normal, ray.dir);
                         incomingLight += emittedLight * rayColor;
+                        rayColor *= lerp(material.color, material.specularColor, isSpecularBounce);
+
+                        if (UseImportanceSampling && material.emissionStrength == 0) {
+                            for (int i = 0; i < NumLights; i ++)
+                            {
+                                MeshInfo meshInfo = AllMeshInfo[Lights[i]];
+                                // float contributionMinPoint = CalculateContribution(hitInfo, meshInfo.boundsMin, float3(0,-1,0), meshInfo.material.emissionStrength);
+                                // float contributionMaxPoint = CalculateContribution(hitInfo, meshInfo.boundsMax, float3(0,-1,0), meshInfo.material.emissionStrength);
+                                // float contribution = (contributionMinPoint + contributionMaxPoint) * .5;
+
+                                // When hitting between 2 triangles, like the middle of a quad, the code will mark as a miss most of the time
+                                // float contribution = CalculateContribution(hitInfo, float3(0,3.99,0), float3(0,-1,0), meshInfo.material.emissionStrength);
+                                // float contribution = CalculateContribution(hitInfo, float3(0.01,3.99,0), float3(0,-1,0), meshInfo.material.emissionStrength);
+
+                                // float3 lightPoint = RandomPointInBox(rngState, meshInfo.boundsMin, meshInfo.boundsMax);
+                                // float contribution = CalculateContribution(hitInfo, lightPoint, float3(0,-1,0), meshInfo.material.emissionStrength);
+
+                                float contribution = 0;
+                                float3 lightNormal = float3(0,-1,0);
+                                for (int j = 0; j < LightSamples; j ++)
+                                {
+                                    float3 lightPoint = RandomPointInBox(rngState, meshInfo.boundsMin, meshInfo.boundsMax);
+                                    contribution += CalculateContribution(hitInfo, lightPoint, lightNormal, meshInfo.material.emissionStrength);
+                                }
+
+                                // float contribution = CalculateContribution(hitInfo, float3(0,2,0), float3(0,1,0), meshInfo.material.emissionStrength);
+                                // float contribution = CalculateContribution(hitInfo, meshInfo.boundsMin + (meshInfo.boundsMax - meshInfo.boundsMin)*.5, float3(0,-1,0), meshInfo.material.emissionStrength);
+                                // incomingLight += contribution * rayColor;
+                                incomingLight += (contribution / LightSamples) * rayColor;
+                            }
+                        }
+
                         // rayColor *= material.color;
                         //rayColor *= material.color * lightStrength * 2;
-                        rayColor *= lerp(material.color, material.specularColor, isSpecularBounce);
+                        // rayColor *= lerp(material.color, material.specularColor, isSpecularBounce);
 
                         if (ShowFocusPlane && bounceIndex == 0) {
                             if (hitInfo.distance > ViewParams.z) {
@@ -499,7 +598,7 @@ Shader "Custom/RayTracing"
 
                 Ray ray;
 
-                for (int rayIndex = 0; rayIndex < NumRaysPerPixel; rayIndex++)
+                for (int rayIndex = 0; rayIndex <= NumRaysPerPixel; rayIndex++)
                 {
                     //ray.origin = _WorldSpaceCameraPos;
                     float2 defocusJitter = RandomPointInCircle(rngState) * DefocusStrength / numPixels.x;
@@ -515,6 +614,12 @@ Shader "Custom/RayTracing"
                         totalIncomingLight += Trace(ray, rngState);
                     }
                 }
+
+                /*if(((totalIncomingLight.x + totalIncomingLight.y + totalIncomingLight.z) / 3.) < 0.0001) {
+                    totalIncomingLight = float3(1,0,1);
+                } else {
+                    totalIncomingLight = float3(0,0,0);
+                }*/
 
                 float3 pixelCol = totalIncomingLight / NumRaysPerPixel;
                 return float4(pixelCol, 1);

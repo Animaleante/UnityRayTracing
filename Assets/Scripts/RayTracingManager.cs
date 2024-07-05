@@ -12,6 +12,7 @@ public class RayTracingManager : MonoBehaviour
     [SerializeField] bool useShaderInSceneView;
     [SerializeField] bool showFocusPlane;
     [SerializeField] bool useSingleRayForDebug;
+    [SerializeField] bool useImportanceSampling;
 
 	[Header("Ray Tracing Settings")]
     [SerializeField, Range(0, 32)] int maxBounceCount = 4;
@@ -19,6 +20,7 @@ public class RayTracingManager : MonoBehaviour
 	[SerializeField, Min(0)] float divergeStrength = 0.3f;
 	[SerializeField, Min(0)] float defocusStrength = 0;
 	[SerializeField, Min(0)] float focusDistance = 1;
+    [SerializeField, Range(1, 10)] int lightSamples = 1;
 	[SerializeField] EnvironmentSettings environmentSettings;
 
 	[Header("References")]
@@ -38,14 +40,41 @@ public class RayTracingManager : MonoBehaviour
 	ComputeBuffer sphereBuffer;
 	ComputeBuffer triangleBuffer;
 	ComputeBuffer meshInfoBuffer;
+	ComputeBuffer lightsBuffer;
 
 	List<Triangle> allTriangles;
 	List<MeshInfo> allMeshInfo;
+	List<uint> lights;
 
     void Start()
     {
         numRenderedFrames = 0;
+
+		Vector3 hitPoint = new Vector3(0.5f,2,2);
+		Vector3 hitPointNormal = new Vector3(0,0,-1);
+		Vector3 lightPoint = new Vector3(0,3.99f,0);
+		Vector3 lightPointNormal = new Vector3(0,-1,0);
+
+		// this.calc(hitPoint, hitPointNormal, lightPoint, lightPointNormal);
+		hitPoint = new Vector3(-0.5f,2,2);
+		// this.calc(hitPoint, hitPointNormal, lightPoint, lightPointNormal);
+		hitPoint = new Vector3(0,2,2);
+		// this.calc(hitPoint, hitPointNormal, lightPoint, lightPointNormal);
     }
+
+	private void calc(Vector3 iPoint, Vector3 iNormal, Vector3 lPoint, Vector3 lNormal) 
+	{
+		Vector3 V = Vector3.Normalize(lPoint - iPoint);
+		float distance = Vector3.Distance(lPoint, iPoint);
+		Debug.Log("Distance: " + distance);
+		// float attenuation = 1 / (distance * distance);
+		// Debug.Log("Attenuation: " + attenuation);
+		float cosThetaHit = Mathf.Max(0, Vector3.Dot(iNormal, V));
+		// float cosThetaLight = Mathf.Max(0, Vector3.Dot(lNormal, -V));
+		Debug.Log("cosThetaHit: " + cosThetaHit);
+		// Debug.Log("cosThetaLight: " + cosThetaLight);
+		// Debug.Log("Contribution: " + (2 * attenuation * cosThetaHit * cosThetaLight));
+	}
     
     void OnRenderImage(RenderTexture src, RenderTexture target)
     {
@@ -140,8 +169,10 @@ public class RayTracingManager : MonoBehaviour
     {
 		allTriangles ??= new List<Triangle>();
 		allMeshInfo ??= new List<MeshInfo>();
+		lights ??= new List<uint>();
 		allTriangles.Clear();
 		allMeshInfo.Clear();
+		lights.Clear();
 
 		RayTracedMesh[] meshObjects = FindObjectsOfType<RayTracedMesh>();
 
@@ -154,6 +185,12 @@ public class RayTracingManager : MonoBehaviour
 				allMeshInfo.Add(new MeshInfo(allTriangles.Count, chunk.triangles.Length, material, chunk.bounds));
 				allTriangles.AddRange(chunk.triangles);
 
+				if(material.emissionStrength > 0) {
+					Debug.Log(chunk.bounds);
+					Debug.Log(chunk.bounds.min);
+					Debug.Log(chunk.bounds.max);
+					lights.Add((uint) allMeshInfo.Count-1);
+				}
 			}
 		}
 
@@ -162,9 +199,12 @@ public class RayTracingManager : MonoBehaviour
 
 		ShaderHelper.CreateStructuredBuffer(ref triangleBuffer, allTriangles);
 		ShaderHelper.CreateStructuredBuffer(ref meshInfoBuffer, allMeshInfo);
+		ShaderHelper.CreateStructuredBuffer(ref lightsBuffer, lights);
 		rayTracingMaterial.SetBuffer("Triangles", triangleBuffer);
 		rayTracingMaterial.SetBuffer("AllMeshInfo", meshInfoBuffer);
+		rayTracingMaterial.SetBuffer("Lights", lightsBuffer);
 		rayTracingMaterial.SetInteger("NumMeshes", allMeshInfo.Count);
+		rayTracingMaterial.SetInteger("NumLights", lights.Count);
     }
 
     void SetShaderParams()
@@ -174,8 +214,10 @@ public class RayTracingManager : MonoBehaviour
 		rayTracingMaterial.SetInteger("Frame", numRenderedFrames);
 		rayTracingMaterial.SetFloat("DivergeStrength", divergeStrength);
 		rayTracingMaterial.SetFloat("DefocusStrength", defocusStrength);
+		rayTracingMaterial.SetInteger("LightSamples", lightSamples);
 		rayTracingMaterial.SetInteger("ShowFocusPlane", showFocusPlane ? 1 : 0);
 		rayTracingMaterial.SetInteger("UseSingleRayForDebug", useSingleRayForDebug ? 1 : 0);
+		rayTracingMaterial.SetInteger("UseImportanceSampling", useImportanceSampling ? 1 : 0);
 
 		rayTracingMaterial.SetInteger("EnvironmentEnabled", environmentSettings.enabled ? 1 : 0);
 		rayTracingMaterial.SetColor("GroundColor", environmentSettings.groundColor);

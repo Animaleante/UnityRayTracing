@@ -53,9 +53,9 @@ public class CameraRayJitterTest : MonoBehaviour
         }
 
         // int imageWidth = 5;
-        int imageWidth = Screen.width;
+        int imageWidth = Screen.width/100;
         // int imageHeight = (int)(imageWidth / cam.aspect);
-        int imageHeight = Screen.height;
+        int imageHeight = Screen.height/100;
 
         float viewportHeight = 1.0f;
         float viewportWidth = cam.aspect * viewportHeight;
